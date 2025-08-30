@@ -211,11 +211,11 @@ const MangaTable = () => {
     },
     {
       accessorKey: "total_chapters",
-      header: "Total Chapters",
+      header: "Total Ch.",
     },
     {
       accessorKey: "current_chapter",
-      header: "Current Chapter",
+      header: "Current Ch.",
     },
     {
       accessorKey: "reading_status",
