@@ -12,6 +12,7 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
+import { EditMangaForm } from "./EditMangaForm";
 import { ChevronDown, MoreHorizontal } from "lucide-react";
 
 import { Button } from "./ui/button";
@@ -68,7 +69,7 @@ const MangaTable = () => {
   const [data, setData] = React.useState<Manga[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-
+  const [editingManga, setEditingManga] = React.useState<Manga | null>(null);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -232,9 +233,7 @@ const MangaTable = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => alert(`Editing ${manga.manga_title}`)}
-              >
+              <DropdownMenuItem onClick={() => setEditingManga(manga)}>
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -471,6 +470,21 @@ const MangaTable = () => {
                 </div>
               </div>
             </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={!!editingManga}
+        onOpenChange={(open) => !open && setEditingManga(null)}
+      >
+        <SheetContent side="right" className="w-[700px]! min-w-md px-4">
+          {editingManga && (
+            <EditMangaForm
+              manga={editingManga}
+              onClose={() => setEditingManga(null)}
+              onUpdated={fetchData} // refresh table after edit
+            />
           )}
         </SheetContent>
       </Sheet>
