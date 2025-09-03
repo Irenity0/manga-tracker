@@ -24,6 +24,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+
 import { Input } from "./ui/input";
 import {
   Table,
@@ -76,6 +87,7 @@ interface MangaTableProps {
 const MangaTable: React.FC<MangaTableProps> = ({ data, refresh, loading }) => {
   const [error, setError] = React.useState<string | null>(null);
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [deletingManga, setDeletingManga] = React.useState<Manga | null>(null);
   const [editingManga, setEditingManga] = React.useState<Manga | null>(null);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -112,14 +124,13 @@ const MangaTable: React.FC<MangaTableProps> = ({ data, refresh, loading }) => {
   };
 
   // === Delete Manga ===
-  const deleteManga = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
-
+  const deleteManga = async (id: string) => {
     try {
       const { error } = await supabase.from("manga").delete().eq("id", id);
       if (error) throw error;
 
       refresh();
+      setDeletingManga(null);
     } catch (err) {
       console.error("[Error deleting manga]", err);
       setError(err instanceof Error ? err.message : "Error deleting manga");
@@ -134,7 +145,7 @@ const MangaTable: React.FC<MangaTableProps> = ({ data, refresh, loading }) => {
       cell: ({ row }) => {
         const title = row.getValue("manga_title") as string;
         const truncated =
-        title.length > 24 ? title.slice(0, 18) + "..." : title;
+          title.length > 24 ? title.slice(0, 18) + "..." : title;
         return <span>{truncated}</span>;
       },
     },
@@ -219,10 +230,11 @@ const MangaTable: React.FC<MangaTableProps> = ({ data, refresh, loading }) => {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="bg-destructive/50 text-white"
-                onClick={() => deleteManga(manga.id, manga.manga_title)}
+                onClick={() => setDeletingManga(manga)}
               >
                 Delete
               </DropdownMenuItem>
+
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setSelectedManga(manga)}>
                 Add note
@@ -480,6 +492,35 @@ const MangaTable: React.FC<MangaTableProps> = ({ data, refresh, loading }) => {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Delete Manga Confirmation */}
+      <AlertDialog
+        open={!!deletingManga}
+        onOpenChange={(open: unknown) => !open && setDeletingManga(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deletingManga?.manga_title}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. It will permanently remove this
+              manga from your tracker.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingManga(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => deletingManga && deleteManga(deletingManga.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
