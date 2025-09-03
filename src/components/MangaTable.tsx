@@ -186,13 +186,23 @@ const MangaTable: React.FC<MangaTableProps> = ({ data, refresh, loading }) => {
         <span className="capitalize">{row.getValue("reading_status")}</span>
       ),
     },
-    {
+      {
       accessorKey: "star_rating",
       header: "Rating",
-      cell: ({ row }) =>
-        row.getValue("star_rating")
-          ? "⭐".repeat(row.getValue("star_rating") as number)
-          : "No rating",
+      cell: ({ row }) => {
+        const rating = row.getValue("star_rating") as number | null;
+        if (!rating) return "No rating";
+
+        return (
+          <div className="flex">
+            {Array.from({ length: rating }).map((_, i) => (
+              <span key={i} className="text-gray-400 text-lg">
+                ★
+              </span> // gray stars
+            ))}
+          </div>
+        );
+      },
     },
     {
       id: "notes",
