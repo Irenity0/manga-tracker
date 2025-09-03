@@ -1,4 +1,5 @@
 "use client";
+
 import * as React from "react";
 import {
   type ColumnDef,
@@ -12,7 +13,6 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { EditMangaForm } from "./EditMangaForm";
 import { ChevronDown, MoreHorizontal } from "lucide-react";
 
 import { Button } from "./ui/button";
@@ -21,7 +21,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
@@ -42,9 +41,12 @@ import {
   SheetTitle,
   SheetDescription,
 } from "./ui/sheet";
-import { supabase } from "@/lib/supabase";
 
-type Manga = {
+import { supabase } from "@/lib/supabase";
+import { EditMangaForm } from "./EditMangaForm";
+
+// === Manga Type ===
+export type Manga = {
   id: string;
   manga_title: string;
   original_title: string;
@@ -65,12 +67,16 @@ type Manga = {
   updated_at: string;
 };
 
-const MangaTable = () => {
-  const [data, setData] = React.useState<Manga[]>([]);
-  const [loading, setLoading] = React.useState(true);
+interface MangaTableProps {
+  data: Manga[];
+  loading: boolean;
+  refresh: () => void;
+}
+
+const MangaTable: React.FC<MangaTableProps> = ({ data, refresh, loading }) => {
   const [error, setError] = React.useState<string | null>(null);
-  const [editingManga, setEditingManga] = React.useState<Manga | null>(null);
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [editingManga, setEditingManga] = React.useState<Manga | null>(null);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
@@ -80,29 +86,7 @@ const MangaTable = () => {
   const [selectedManga, setSelectedManga] = React.useState<Manga | null>(null);
   const [newNote, setNewNote] = React.useState("");
 
-  // Fetch data from Supabase
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("manga")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setData(data as Manga[]);
-    } catch (err) {
-      console.error("[Error fetching manga]", err);
-      setError(err instanceof Error ? err.message : "Error fetching manga");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Add Note
+  // === Add note ===
   const addNote = async () => {
     if (!selectedManga || !newNote.trim()) return;
 
@@ -118,7 +102,7 @@ const MangaTable = () => {
 
       if (error) throw error;
 
-      fetchData();
+      refresh();
       setSelectedManga(null);
       setNewNote("");
     } catch (err) {
@@ -127,20 +111,22 @@ const MangaTable = () => {
     }
   };
 
-  // Delete Manga
+  // === Delete Manga ===
   const deleteManga = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+
     try {
       const { error } = await supabase.from("manga").delete().eq("id", id);
       if (error) throw error;
-      fetchData();
+
+      refresh();
     } catch (err) {
       console.error("[Error deleting manga]", err);
       setError(err instanceof Error ? err.message : "Error deleting manga");
     }
   };
 
-  // Table Columns
+  // === Table Columns ===
   const columns: ColumnDef<Manga>[] = [
     {
       accessorKey: "manga_title",
@@ -148,7 +134,7 @@ const MangaTable = () => {
       cell: ({ row }) => {
         const title = row.getValue("manga_title") as string;
         const truncated =
-          title.length > 24 ? title.slice(0, 18) + "..." : title;
+        title.length > 24 ? title.slice(0, 18) + "..." : title;
         return <span>{truncated}</span>;
       },
     },
@@ -164,18 +150,21 @@ const MangaTable = () => {
     {
       accessorKey: "genres",
       header: "Genres",
-      cell: ({ row }) => (
-        <div className="flex flex-wrap gap-1">
-          {row.original.genres?.map((g) => (
-            <span
-              key={g}
-              className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-            >
-              {g}
-            </span>
-          )) || "—"}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const genres = row.original.genres || [];
+        return (
+          <div className="flex flex-wrap gap-1">
+            {genres.map((g) => (
+              <span
+                key={g}
+                className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+              >
+                {g}
+              </span>
+            ))}
+          </div>
+        );
+      },
     },
     { accessorKey: "total_chapters", header: "Total Ch." },
     { accessorKey: "current_chapter", header: "Current Ch." },
@@ -189,20 +178,10 @@ const MangaTable = () => {
     {
       accessorKey: "star_rating",
       header: "Rating",
-      cell: ({ row }) => {
-        const rating = row.getValue("star_rating") as number | null;
-        if (!rating) return "No rating";
-
-        return (
-          <div className="flex">
-            {Array.from({ length: rating }).map((_, i) => (
-              <span key={i} className="text-gray-400 text-lg">
-                ★
-              </span> // gray stars
-            ))}
-          </div>
-        );
-      },
+      cell: ({ row }) =>
+        row.getValue("star_rating")
+          ? "⭐".repeat(row.getValue("star_rating") as number)
+          : "No rating",
     },
     {
       id: "notes",
@@ -213,7 +192,7 @@ const MangaTable = () => {
           size="sm"
           onClick={() => setSelectedManga(row.original)}
         >
-          View Notes
+          Notes
         </Button>
       ),
     },
@@ -231,13 +210,15 @@ const MangaTable = () => {
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setEditingManga(manga)}>
+            <DropdownMenuContent className="space-y-2" align="end">
+              <DropdownMenuItem
+                className="bg-primary/50 text-white"
+                onClick={() => setEditingManga(manga)}
+              >
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="text-red-500"
+                className="bg-destructive/50 text-white"
                 onClick={() => deleteManga(manga.id, manga.manga_title)}
               >
                 Delete
@@ -253,7 +234,7 @@ const MangaTable = () => {
     },
   ];
 
-  // TanStack Table
+  // === TanStack React Table ===
   const table = useReactTable({
     data,
     columns,
@@ -265,7 +246,12 @@ const MangaTable = () => {
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    state: { sorting, columnFilters, columnVisibility, rowSelection },
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+    },
     initialState: {
       pagination: {
         pageSize: 7,
@@ -314,7 +300,7 @@ const MangaTable = () => {
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-md border">
+      <div className="overflow-hidden rounded-md scrollbar-thin scrollbar-thumb-muted scrollbar-track-background border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -332,6 +318,7 @@ const MangaTable = () => {
               </TableRow>
             ))}
           </TableHeader>
+
           <TableBody>
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
@@ -379,6 +366,7 @@ const MangaTable = () => {
           Page {table.getState().pagination.pageIndex + 1} of{" "}
           {table.getPageCount()}
         </div>
+
         <div className="space-x-2">
           <Button
             variant="outline"
@@ -399,7 +387,26 @@ const MangaTable = () => {
         </div>
       </div>
 
-      {/* Notes Sheet */}
+      {/* Edit Manga Sheet */}
+      <Sheet
+        open={!!editingManga}
+        onOpenChange={(open) => !open && setEditingManga(null)}
+      >
+        <SheetContent side="right" className="w-[700px]! min-w-md px-4">
+          <SheetHeader>
+            <SheetTitle>Edit {editingManga?.manga_title}</SheetTitle>
+          </SheetHeader>
+          {editingManga && (
+            <EditMangaForm
+              manga={editingManga}
+              onClose={() => setEditingManga(null)}
+              onUpdated={refresh}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Notes + Info Sheet */}
       <Sheet
         open={!!selectedManga}
         onOpenChange={(open) => !open && setSelectedManga(null)}
@@ -470,21 +477,6 @@ const MangaTable = () => {
                 </div>
               </div>
             </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      <Sheet
-        open={!!editingManga}
-        onOpenChange={(open) => !open && setEditingManga(null)}
-      >
-        <SheetContent side="right" className="w-[700px]! min-w-md px-4">
-          {editingManga && (
-            <EditMangaForm
-              manga={editingManga}
-              onClose={() => setEditingManga(null)}
-              onUpdated={fetchData} // refresh table after edit
-            />
           )}
         </SheetContent>
       </Sheet>
