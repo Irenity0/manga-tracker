@@ -188,8 +188,20 @@ const MangaTable = () => {
     {
       accessorKey: "star_rating",
       header: "Rating",
-      cell: ({ row }) =>
-        "⭐".repeat(row.getValue("star_rating") ?? 0) || "No rating",
+      cell: ({ row }) => {
+        const rating = row.getValue("star_rating") as number | null;
+        if (!rating) return "No rating";
+
+        return (
+          <div className="flex">
+            {Array.from({ length: rating }).map((_, i) => (
+              <span key={i} className="text-gray-400 text-lg">
+                ★
+              </span> // gray stars
+            ))}
+          </div>
+        );
+      },
     },
     {
       id: "notes",
@@ -268,7 +280,9 @@ const MangaTable = () => {
       <div className="flex items-center py-4">
         <Input
           placeholder="Filter by title..."
-          value={(table.getColumn("manga_title")?.getFilterValue() as string) ?? ""}
+          value={
+            (table.getColumn("manga_title")?.getFilterValue() as string) ?? ""
+          }
           onChange={(event) =>
             table.getColumn("manga_title")?.setFilterValue(event.target.value)
           }
@@ -338,14 +352,20 @@ const MangaTable = () => {
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   No results.
                 </TableCell>
               </TableRow>
