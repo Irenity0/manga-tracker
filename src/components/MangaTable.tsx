@@ -1,3 +1,4 @@
+"use client";
 import * as React from "react";
 import {
   type ColumnDef,
@@ -40,6 +41,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "./ui/sheet";
+import { supabase } from "@/lib/supabase";
 
 type Manga = {
   id: string;
@@ -62,101 +64,11 @@ type Manga = {
   updated_at: string;
 };
 
-const initialData: Manga[] = [
-  {
-    id: "1",
-    manga_title: "Haikyuu!!",
-    original_title: "ハイキュー!!",
-    author: "Haruichi Furudate",
-    status: "completed",
-    genres: ["Sports", "Comedy", "Drama"],
-    star_rating: 5,
-    total_chapters: 402,
-    current_chapter: 402,
-    reading_status: "completed",
-    notes: "One of the most inspiring sports manga ever.",
-    created_at: "2025-08-30T00:00:00Z",
-    updated_at: "2025-08-30T00:00:00Z",
-  },
-  {
-    id: "2",
-    manga_title: "The Summer Hikaru Died",
-    original_title: "光が死んだ夏",
-    author: "Mokumokuren",
-    status: "ongoing",
-    genres: ["Horror", "Psychological", "Drama"],
-    star_rating: 5,
-    total_chapters: 40,
-    current_chapter: 30,
-    reading_status: "reading",
-    notes: "Eerie atmosphere, gripping story.",
-    created_at: "2025-08-30T00:00:00Z",
-    updated_at: "2025-08-30T00:00:00Z",
-  },
-  {
-    id: "3",
-    manga_title: "Jujutsu Kaisen",
-    original_title: "呪術廻戦",
-    author: "Gege Akutami",
-    status: "ongoing",
-    genres: ["Action", "Supernatural", "Dark Fantasy"],
-    star_rating: 5,
-    total_chapters: 270, // ongoing
-    current_chapter: 270,
-    reading_status: "reading",
-    notes: "Dark and thrilling, Gojo supremacy.",
-    created_at: "2025-08-30T00:00:00Z",
-    updated_at: "2025-08-30T00:00:00Z",
-  },
-  {
-    id: "4",
-    manga_title: "Tokyo Ghoul",
-    original_title: "東京喰種トーキョーグール",
-    author: "Sui Ishida",
-    status: "completed",
-    genres: ["Dark Fantasy", "Psychological", "Horror"],
-    star_rating: 5,
-    total_chapters: 143,
-    current_chapter: 143,
-    reading_status: "completed",
-    notes: "Haunting and tragic masterpiece.",
-    created_at: "2025-08-30T00:00:00Z",
-    updated_at: "2025-08-30T00:00:00Z",
-  },
-  {
-    id: "5",
-    manga_title: "Death Note",
-    original_title: "デスノート",
-    author: "Tsugumi Ohba / Takeshi Obata",
-    status: "completed",
-    genres: ["Thriller", "Psychological", "Supernatural"],
-    star_rating: 5,
-    total_chapters: 108,
-    current_chapter: 108,
-    reading_status: "completed",
-    notes: "Classic battle of wits, Light vs L forever.",
-    created_at: "2025-08-30T00:00:00Z",
-    updated_at: "2025-08-30T00:00:00Z",
-  },
-  {
-    id: "6",
-    manga_title: "Omniscient Reader’s Viewpoint",
-    original_title: "전지적 독자 시점",
-    author: "Sing-Shong",
-    status: "ongoing",
-    genres: ["Action", "Fantasy", "Psychological"],
-    star_rating: 5,
-    total_chapters: 120, // ongoing
-    current_chapter: 120,
-    reading_status: "reading",
-    notes: "Kim Dokja supremacy ✨",
-    created_at: "2025-08-30T00:00:00Z",
-    updated_at: "2025-08-30T00:00:00Z",
-  },
-];
-
 const MangaTable = () => {
-  const [data, setData] = React.useState<Manga[]>(initialData);
+  const [data, setData] = React.useState<Manga[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -167,25 +79,80 @@ const MangaTable = () => {
   const [selectedManga, setSelectedManga] = React.useState<Manga | null>(null);
   const [newNote, setNewNote] = React.useState("");
 
+  // Fetch data from Supabase
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("manga")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setData(data as Manga[]);
+    } catch (err) {
+      console.error("[Error fetching manga]", err);
+      setError(err instanceof Error ? err.message : "Error fetching manga");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Add Note
+  const addNote = async () => {
+    if (!selectedManga || !newNote.trim()) return;
+
+    try {
+      const updatedNotes = selectedManga.notes
+        ? `${selectedManga.notes}\n${newNote}`
+        : newNote;
+
+      const { error } = await supabase
+        .from("manga")
+        .update({ notes: updatedNotes, updated_at: new Date().toISOString() })
+        .eq("id", selectedManga.id);
+
+      if (error) throw error;
+
+      fetchData();
+      setSelectedManga(null);
+      setNewNote("");
+    } catch (err) {
+      console.error("[Error adding note]", err);
+      setError(err instanceof Error ? err.message : "Error adding note");
+    }
+  };
+
+  // Delete Manga
+  const deleteManga = async (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+    try {
+      const { error } = await supabase.from("manga").delete().eq("id", id);
+      if (error) throw error;
+      fetchData();
+    } catch (err) {
+      console.error("[Error deleting manga]", err);
+      setError(err instanceof Error ? err.message : "Error deleting manga");
+    }
+  };
+
+  // Table Columns
   const columns: ColumnDef<Manga>[] = [
     {
       accessorKey: "manga_title",
       header: "Title",
-      cell: ({row})=>{
+      cell: ({ row }) => {
         const title = row.getValue("manga_title") as string;
-        const truncated = 
-        title.length > 24 ? title.slice(0, 18) + "..." : title;
-        return <span>{truncated}</span>
-      }
+        const truncated =
+          title.length > 24 ? title.slice(0, 18) + "..." : title;
+        return <span>{truncated}</span>;
+      },
     },
-    {
-      accessorKey: "original_title",
-      header: "Original Title",
-    },
-    {
-      accessorKey: "author",
-      header: "Author",
-    },
+    { accessorKey: "original_title", header: "Original Title" },
+    { accessorKey: "author", header: "Author" },
     {
       accessorKey: "status",
       header: "Status",
@@ -209,14 +176,8 @@ const MangaTable = () => {
         </div>
       ),
     },
-    {
-      accessorKey: "total_chapters",
-      header: "Total Ch.",
-    },
-    {
-      accessorKey: "current_chapter",
-      header: "Current Ch.",
-    },
+    { accessorKey: "total_chapters", header: "Total Ch." },
+    { accessorKey: "current_chapter", header: "Current Ch." },
     {
       accessorKey: "reading_status",
       header: "Reading Status",
@@ -265,7 +226,8 @@ const MangaTable = () => {
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => alert(`Delete ${manga.manga_title}`)}
+                className="text-red-500"
+                onClick={() => deleteManga(manga.id, manga.manga_title)}
               >
                 Delete
               </DropdownMenuItem>
@@ -280,6 +242,7 @@ const MangaTable = () => {
     },
   ];
 
+  // TanStack Table
   const table = useReactTable({
     data,
     columns,
@@ -291,30 +254,13 @@ const MangaTable = () => {
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      rowSelection,
+    state: { sorting, columnFilters, columnVisibility, rowSelection },
+    initialState: {
+      pagination: {
+        pageSize: 7,
+      },
     },
   });
-
-  const addNote = () => {
-    if (!selectedManga || !newNote.trim()) return;
-    setData((prev) =>
-      prev.map((m) =>
-        m.id === selectedManga.id
-          ? { ...m, notes: m.notes ? `${m.notes}\n${newNote}` : newNote }
-          : m
-      )
-    );
-    setSelectedManga((prev) =>
-      prev
-        ? { ...prev, notes: prev.notes ? `${prev.notes}\n${newNote}` : newNote }
-        : prev
-    );
-    setNewNote("");
-  };
 
   return (
     <div className="w-full -mt-7 font-mono">
@@ -352,6 +298,8 @@ const MangaTable = () => {
         </DropdownMenu>
       </div>
 
+      {error && <p className="text-sm text-red-500">{error}</p>}
+
       {/* Table */}
       <div className="overflow-hidden rounded-md border">
         <Table>
@@ -372,7 +320,17 @@ const MangaTable = () => {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {columns.map((_col, j) => (
+                    <TableCell key={j}>
+                      <div className="h-10 bg-secondary rounded animate-pulse w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -380,20 +338,14 @@ const MangaTable = () => {
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
+                <TableCell colSpan={columns.length} className="h-24 text-center">
                   No results.
                 </TableCell>
               </TableRow>
@@ -404,9 +356,9 @@ const MangaTable = () => {
 
       {/* Footer */}
       <div className="flex items-center justify-between py-4">
-        <div className="text-muted-foreground flex-1 text-sm">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+        <div className="text-sm text-muted-foreground">
+          Page {table.getState().pagination.pageIndex + 1} of{" "}
+          {table.getPageCount()}
         </div>
         <div className="space-x-2">
           <Button
@@ -428,7 +380,7 @@ const MangaTable = () => {
         </div>
       </div>
 
-      {/* Notes + Info Sheet */}
+      {/* Notes Sheet */}
       <Sheet
         open={!!selectedManga}
         onOpenChange={(open) => !open && setSelectedManga(null)}
@@ -455,7 +407,7 @@ const MangaTable = () => {
                   </div>
                   <div>
                     <span className="font-semibold">Genres:</span>{" "}
-                    {selectedManga.genres!.join(", ")}
+                    {selectedManga.genres?.join(", ")}
                   </div>
                   <div>
                     <span className="font-semibold">Total Chapters:</span>{" "}
@@ -471,7 +423,7 @@ const MangaTable = () => {
                   </div>
                   <div>
                     <span className="font-semibold">Rating:</span>{" "}
-                    {"⭐".repeat(selectedManga.star_rating!)}
+                    {"⭐".repeat(selectedManga.star_rating || 0)}
                   </div>
                 </div>
 
