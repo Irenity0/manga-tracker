@@ -328,7 +328,7 @@ const MangaTable: React.FC<MangaTableProps> = ({ data, refresh, loading }) => {
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead  className="bg-secondary/50 text-secondary-foreground" key={header.id}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(
